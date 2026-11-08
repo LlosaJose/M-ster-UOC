@@ -1,0 +1,309 @@
+# RETO 1. Manipulación de datos y estadística descriptiva con R
+# Script base para estudiantes
+#
+# Organización recomendada:
+#   Reto_1/
+#     data/
+#     scripts/
+#     rmarkdown/
+#
+# Trabaja sobre una copia de este archivo y guarda los cambios de forma frecuente.
+
+# En RStudio, antes de ejecutar el script, puedes usar:
+# Session > Set Working Directory > To Source File Location
+# Así, la ruta ../data funcionará sin modificar rutas personales.
+
+# 1. Paquetes -------------------------------------------------------------
+# Instala los paquetes solo si no los tienes:
+# install.packages(c("data.table", "dplyr", "ggplot2", "lubridate"))
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+# 2. Carga de datos -------------------------------------------------------
+data_path <- "../data"
+
+iris_data <- fread(file.path(data_path, "iris_data.txt"))
+business_staff <- fread(file.path(data_path, "business_staff_cross_section_original_names.txt"))
+families_raw <- fread(file.path(data_path, "ZA8630_families_teaching_extract_original_names.txt"), na.strings = c("", "NA"))
+children_raw <- fread(file.path(data_path, "ZA8630_children_teaching_extract_original_names.txt"), na.strings = c("", "NA"))
+
+# 3. Nombres de variables fáciles de leer --------------------------------
+setnames(business_staff,
+         old = c("obs", "EDU", "inc", "zufr", "trip"),
+         new = c("wave", "education", "income", "happiness", "trip_abroad"))
+
+setnames(families_raw,
+         old = c("doc", "dat4", "cort", "sozial", "grasen", "idm", "gebm4", "todm4", "idf", "gebf4", "todf4"),
+         new = c("family_id", "marriage_date", "marriage_place", "social_group", "landholding_grasen", "husband_id", "husband_birth_date", "husband_death_date", "wife_id", "wife_birth_date", "wife_death_date"))
+
+setnames(children_raw,
+         old = c("doc", "idk", "sex", "gebk4", "todk4", "gebortk", "todortk", "berufek"),
+         new = c("family_id", "child_id", "gender", "child_birth_date", "child_death_date", "child_birth_place", "child_death_place", "child_occupation"))
+
+children_raw[gender == "M", gender := "male"]
+children_raw[gender == "W", gender := "female"]
+
+# 4. Formatos -------------------------------------------------------------
+date_variables_families <- c("marriage_date", "husband_birth_date", "husband_death_date", "wife_birth_date", "wife_death_date")
+families_raw[, (date_variables_families) := lapply(.SD, as.Date), .SDcols = date_variables_families]
+children_raw[, child_birth_date := as.Date(child_birth_date)]
+children_raw[, child_death_date := as.Date(child_death_date)]
+business_staff[, education := factor(education, levels = c("low", "middle", "high"))]
+business_staff[, gender := factor(gender)]
+
+# 5. Comprobaciones iniciales --------------------------------------------
+str(iris_data)
+str(business_staff)
+str(families_raw)
+str(children_raw)
+
+# A partir de aquí completa los ejercicios del reto.
+# No borres el bloque de carga y preparación: forma parte de la reproducibilidad.
+
+# EJERCICIO A. Selección y creación de variables con iris -----------------
+# TODO: crea los subconjuntos pedidos y las nuevas variables.
+
+
+#Pregunta 1. Revisa la estructura de iris
+
+str(iris_data)
+head(iris_data)
+colSums(is.na(iris_data))
+summary(iris_data)
+
+
+
+
+
+
+#Pregunta 2.a. Crea varios subconjuntos de iris, filtra observaciones y genera dos variables derivadas
+
+iris_data$PetalAboveMean <- if_else(iris_data$PetalLengthCm >= mean(iris_data$PetalLengthCm), "Si", "No")
+str(iris_data$PetalAboveMean)
+table(iris_data$PetalAboveMean)
+
+iris_data$SepalAboveMean <- if_else(iris_data$SepalLengthCm >= mean(iris_data$SepalLengthCm), "Si", "No")
+str(iris_data$SepalAboveMean)
+table(iris_data$SepalAboveMean)
+
+
+iris_data$tamano <- factor(
+  if_else(
+    iris_data$PetalAboveMean == "Si" & iris_data$SepalAboveMean == "Si", "Grande",
+    if_else(
+     iris_data$PetalAboveMean == "Si" & iris_data$SepalAboveMean == "No", "Petalo grande",
+      if_else(
+        iris_data$PetalAboveMean == "No" & iris_data$SepalAboveMean == "Si", "Sepalo grande", "Small"
+))))
+
+str(iris_data$tamano)
+table(iris_data$tamano)
+
+comprobacion <- iris_data |> 
+  filter(SepalAboveMean == "Si") #No hay casos Sépalo Grande, se comprueba
+
+table(comprobacion$PetalAboveMean) #Es correcto, todos los sépalo grande son petalo grande
+
+
+#Tres subconjuntos de acuerdo al tamaño creado
+Sepal_Petal_Big <- iris_data |>
+  filter(tamano == "Grande")
+Petal_Big <- iris_data |>
+  filter(tamano == "Petalo grande")
+Sepal_Petal_Small<- iris_data |>
+  filter(tamano == "Small")
+
+#Comprobación de que la construcción es adecuada
+str(Sepal_Petal_Big)
+table(Sepal_Petal_Big$tamano)
+
+str(Petal_Big)
+table(Petal_Big$tamano)
+
+str(Sepal_Petal_Small)
+table(Sepal_Petal_Small$tamano)
+
+#2.b.Calcula estadísticos descriptivos para el conjunto completo y por Species.
+
+summary(iris_data) #conjunto completo, estadística descriptiva
+
+
+#Se hacen dos listas de vars a explorar por especies
+#Se procede de este modo para que las tablas sean de menor tamaño
+vars <- c("SepalLengthCm", "PetalLengthCm") 
+vars2<- c("SepalWidthCm", "PetalWidthCm")
+
+#Descriptivos de las variables Length
+iris_data |> 
+  group_by(Species) |>
+  summarise(across(c(vars),
+                   list(Media = mean, DT = sd)), n=n())
+
+#Descriptivos de las variables Width
+iris_data |> 
+  group_by(Species) |>
+  summarise(across(c(vars2),
+                   list(Media = mean, DT = sd)), n=n())
+
+#https://dplyr.tidyverse.org/reference/across.html
+#https://betaeconomia.blogspot.com/2021/01/tidyverse-r-trabajando-variables-con-la.html
+#https://stackoverflow.com/questions/71744913/r-summarize-across-with-multiple-functions
+
+### EJERCICIO B. Estructura relacional de families / children ---------------
+# TODO: combina las tablas por family_id y calcula las edades parentales.
+
+
+
+
+#3. Revisa los dos archivos históricos ZA8630 incluidos en data/. 
+#El script base carga los datos y cambia los nombres de las variables 
+#utilizadas a la convención docente en inglés. Documenta la correspondencia 
+#entre los nombres originales y los nombres de trabajo.
+
+
+str(children_raw)
+str(families_raw)
+
+head(children_raw)
+head(families_raw)
+
+#Hacer un libro de códigos.
+
+
+#4.	Combina las tablas históricas mediante family_id. Explica por qué la 
+#relación es uno-a-muchos y calcula mother_age_at_birth y father_age_at_birth 
+#en años. Indica cuál es la unidad de observación de la tabla resultante 
+#y si su estructura responde a la lógica de tidy data.
+
+length(unique(children_raw$family_id)) #Comprobar si hay casos repetidos
+length(unique(families_raw$family_id))
+
+table(is.na(children_raw$family_id)) #comprobar si hay datos perdidos
+table(is.na(families_raw$family_id))
+
+
+family_and_children <- merge(families_raw,children_raw,by="family_id",all.x=TRUE,all.y=TRUE)
+
+
+
+table(is.na(family_and_children$family_id))
+str(family_and_children)
+head(family_and_children)
+
+
+
+#Calculo edad de la madre al nacimiento de su hijo/s. Expresada en años.
+family_and_children <- family_and_children |> 
+  mutate(mother_age_at_birth = (child_birth_date - wife_birth_date))
+
+family_and_children$mother_age_at_birth <- as.numeric(family_and_children$mother_age_at_birth)
+class(family_and_children$mother_age_at_birth) #se comprueba que sea nuérica
+
+family_and_children$mother_age_at_birth <- round(family_and_children$mother_age_at_birth/365.25, 2)  
+
+
+#Calculo edad del al nacimiento de su hijo/s. Expresada en años.
+family_and_children <- family_and_children |> 
+  mutate(father_age_at_birth = (child_birth_date - husband_birth_date))
+
+family_and_children$father_age_at_birth <- as.numeric(family_and_children$father_age_at_birth)
+class(family_and_children$father_age_at_birth) #se comprueba que sea nuérica
+
+family_and_children$father_age_at_birth <- round(family_and_children$father_age_at_birth/365.25, 2)  
+
+
+
+
+str(family_and_children)
+
+
+
+#REFS: https://es.stackoverflow.com/questions/395480/c%C3%B3mo-contar-en-r-el-n%C3%BAmero-de-valores-distintos-de-una-columna-de-un-fichero-ex
+#REFS: https://rpubs.com/CarlosFVG/DatesWithRCFVG
+#REFS: https://stackoverflow.com/questions/63523659/convert-days-to-years-in-r
+
+
+
+
+
+# EJchildren_raw# EJERCICIO C. Descripción e inferencia básica ----------------------------
+# TODO: descriptivos, visualizaciones, correlación, prueba t y chi-cuadrado.
+
+
+#5. Con business_staff, describe education, income, happiness, gender y trip_abroad. 
+#Plantea una pregunta sencilla y acompaña la descripción con al menos una tabla 
+#y dos gráficos que ayuden a responderla.
+
+str(business_staff)
+
+summary(business_staff)
+colSums(is.na(business_staff))
+
+
+#Pregunta: ¿Se observa relación entre el nivel educativo, la felicidad y los ingresos?
+
+descripcion_educativo <- business_staff |> 
+  group_by(education) |>
+  summarise(n(), across(c(happiness, income), 
+                        list(Media = mean, DT=sd)), n()) 
+
+descripcion_educativo #Tabla descriptivos
+
+
+boxplot(happiness~education, data = business_staff) #gráfico
+boxplot(income~education, data = business_staff) #gráfico
+plot(business_staff$happiness~business_staff$income) #gráfico 2 (puede estar condicionado por outliers)
+
+
+#6.	Calcula la correlación de Pearson entre income y happiness. Interpreta 
+#la dirección y la magnitud de la asociación y comenta el p-value sin 
+#reducir la conclusión a si supera o no un umbral.
+
+shapiro.test(business_staff$happiness)
+shapiro.test(business_staff$income)
+
+
+cor.test(business_staff$happiness, business_staff$income, method = "spearman")
+
+
+#7.Compara income por gender mediante una prueba t y estudia la asociación entre 
+#education y gender mediante una prueba chi-square. 
+#Explica los resultados en términos de diferencias o asociaciones observadas y de su incertidumbre.
+
+#----a) T-TEST
+
+#Test de levene
+library(car) #paquete contiene la función leveneTest
+leveneTest(income ~ gender, data=business_staff, center = mean)
+
+#Prueba T
+PruebaT <- t.test(income ~ gender, data=business_staff, var.equal = TRUE)
+
+print(PruebaT)
+
+#Descriptivos del T-test
+
+group_by(business_staff, gender) |>
+  summarise(
+    N = n(),
+    Media = mean(income),
+    DT = sd(income)
+  )
+  
+
+#----b) Test chi-square
+chisq.test(business_staff$gender, business_staff$education)
+
+table(business_staff$gender, business_staff$education) #tabla de frecuencias
+
+
+
+
+# 6. Apoyo para el informe R Markdown ------------------------------------
+# El informe debe combinar texto, código y resultados. No pegues toda la salida
+# de la consola: selecciona lo que ayuda a responder cada pregunta.
+# En el último apartado del .Rmd puedes incluir sessionInfo().
+
